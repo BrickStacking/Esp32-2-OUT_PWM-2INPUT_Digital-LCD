@@ -1,3 +1,4 @@
+///////--- Add private library  ----------
 #include <Arduino.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -21,6 +22,7 @@ WiFiClient client;
 #include <Ticker.h>
 Ticker ticker, sent_speed;
 LiquidCrystal_I2C lcd(0x3F, 20, 4);
+///////--- Declare private define  ----------
 #define ONE_WIRE_BUS_1 17
 #define ONE_WIRE_BUS_2 16
 #define PWM1 18
@@ -32,20 +34,30 @@ LiquidCrystal_I2C lcd(0x3F, 20, 4);
 #define BT5 27
 #define BUILTIN_LED 2
 #define BLYNK_PRINT Serial
+///////--- Declare private class  ----------
 OneWire oneWire_in(ONE_WIRE_BUS_1);
 OneWire oneWire_out(ONE_WIRE_BUS_2);
 DallasTemperature sen1(&oneWire_in);
 DallasTemperature sen2(&oneWire_out);
-
+///////--- Declare private varible  ----------
 int PWM_FREQUENCY = 5000;
 int PWM_CHANNEL1 = 0;
 int PWM_CHANNEL2 = 0;
 int PWM_RESOUTION = 10;
 bool Connected2Blynk = false;
 int dem1, dem2, dem3, dem4, dem5;
+int pwm1, pwm2, pwm1_low, pwm1_medium, pwm1_high, pwm2_low, pwm2_medium, pwm2_high;
+int mode_control1, mode_control2;
+float temp1, temp2;
+unsigned long time1, time2;
+int page_lcd = 0, last_page_lcd = 0;
 BlynkTimer timer;
+///////--- Declare private function ----------
 void get_tem(void);
 void out_pwm();
+void display_lcd(void);
+void re_update_to_blynk(void);
+void button_processing();
 void tick()
 {
   //toggle state
@@ -62,6 +74,60 @@ void configModeCallback(WiFiManager *myWiFiManager)
   ticker.attach(0.2, tick);
 }
 void myTimerEvent();
+
+//////////--- Using for Blynk------/////////
+BLYNK_WRITE(V2)
+{
+  if (param.asInt() == 0)
+  {
+    mode_control1 = 0;
+  }
+  else
+    mode_control1 = 1;
+  // process received value
+}
+
+BLYNK_WRITE(V3)
+{
+  if (param.asInt() == 0)
+  {
+    mode_control2 = 0;
+  }
+  else
+    mode_control2 = 1;
+  // process received value
+}
+
+BLYNK_WRITE(V6)
+{
+  if (1 == mode_control1)
+  {
+    pwm1 = param.asInt();
+    Serial.println("Update PWM1");
+  }
+  else
+  {
+    Serial.println("No update PWM1");
+  }
+
+  // process received value
+}
+
+BLYNK_WRITE(V7)
+{
+  if (1 == mode_control2)
+  {
+    pwm2 = param.asInt();
+    Serial.println("Update PWM2");
+  }
+  else
+  {
+    Serial.println("No update PWM2");
+  }
+
+  // process received value
+}
+
 void setup()
 {
   // put your setup code here, to run once:
@@ -78,10 +144,9 @@ void setup()
   }
 
   Serial.println("Start Blynk");
-  Blynk.config("75ca160b7a4b43a8b5e200e556afcad1", "gith.cf", 8442);
+  Blynk.config("0758562a1dbc4e79b67633d4316d4947", "gith.cf", 8442);
   timer.setInterval(10000L, myTimerEvent);
   Serial.println("Done !"); //  Serial.println("Start Blynk");
-
 
   ledcSetup(PWM_CHANNEL1, PWM_FREQUENCY, PWM_RESOUTION);
   ledcAttachPin(PWM1, PWM_CHANNEL1);
@@ -108,25 +173,130 @@ void setup()
     lcd.print(".");
     delay(70);
   }
+  time1 = millis();
+  time2 = millis();
+  lcd.clear();
+  re_update_to_blynk(); //Set Blynk app to factory
 }
 
+/*--------- Start Loop--------------------*/
+//----------------------------------------//
 void loop()
 {
-  Blynk.run();
-  Serial.print(digitalRead(BT1));
-  Serial.print(digitalRead(BT2));
-  Serial.print(digitalRead(BT3));
-  Serial.print(digitalRead(BT4));
-  Serial.println(digitalRead(BT5));
-  get_tem();
-  ledcWrite(PWM_CHANNEL1, 500);
-  ledcWrite(PWM_CHANNEL2, 500);
-  delay(3000);
-  ledcWrite(PWM_CHANNEL1, 1023);
-  ledcWrite(PWM_CHANNEL2, 1023);
-  delay(3000);
+  ledcWrite(PWM_CHANNEL1, 400);
+  ledcWrite(PWM_CHANNEL2, 800);
+  // Blynk.run();
+  // button_processing();
+  // // Serial.print(digitalRead(BT1));
+  // // Serial.print(digitalRead(BT2));
+  // // Serial.print(digitalRead(BT3));
+  // // Serial.print(digitalRead(BT4));
+  // // Serial.println(digitalRead(BT5));
+  // if (millis() - time1 > 5000)
+  // {
+  //   get_tem();
+  //   time1 = millis();
+  // }
+
+  // if (millis() - time2 > 2000)
+  // {
+  //   display_lcd();
+  //   time2 = millis();
+  // }
+  // out_pwm();
+  // if (last_page_lcd != page_lcd)
+  // {
+  //   lcd.clear();
+  //   display_lcd();
+  //   last_page_lcd = page_lcd;
+  // }
 }
 
+/*--------- End Loop--------------------*/
+//----------------------------------------//
+void button_processing()
+{
+  //--- Button 1
+  if (0 == digitalRead(BT1))
+  {
+    dem1++;
+  }
+  if (1 == digitalRead(BT1))
+  {
+    dem1 = 0;
+  }
+  if (2 == dem1)
+  {
+    Serial.println("Button1 press");
+    page_lcd++;
+    if (page_lcd >= 9)
+    {
+      page_lcd = 0;
+    }
+  }
+
+  //--- Button 2
+  if (0 == digitalRead(BT2))
+  {
+    dem2++;
+  }
+  if (1 == digitalRead(BT2))
+  {
+    dem2 = 0;
+  }
+  if (2 == dem2)
+  {
+    Serial.println("Button2 press");
+    page_lcd--;
+    if (page_lcd < 0)
+    {
+      page_lcd = 0;
+    }
+  }
+
+  //--- Button 3
+  if (0 == digitalRead(BT3))
+  {
+    dem3++;
+  }
+  if (1 == digitalRead(BT3))
+  {
+    dem3 = 0;
+  }
+  if (2 == dem3)
+  {
+    Serial.println("Button3 press");
+  }
+
+  //--- Button 4
+  if (0 == digitalRead(BT4))
+  {
+    dem4++;
+  }
+  if (1 == digitalRead(BT4))
+  {
+    dem4 = 0;
+  }
+  if (2 == dem4)
+  {
+    Serial.println("Button4 press");
+  }
+
+  //--- Button 5
+  if (0 == digitalRead(BT5))
+  {
+    dem5++;
+  }
+  if (1 == digitalRead(BT5))
+  {
+    dem5 = 0;
+  }
+  if (2 == dem5)
+  {
+    Serial.println("Button5 press");
+    page_lcd = 0;
+  }
+}
 void get_tem(void)
 {
 
@@ -136,29 +306,187 @@ void get_tem(void)
   Serial.println(" done");
 
   Serial.print("Inhouse: ");
-  Serial.println(sen1.getTempCByIndex(0));
+  temp1 = sen1.getTempCByIndex(0);
+  Serial.println(temp1);
 
   Serial.print("Outhouse: ");
-  Serial.println(sen2.getTempCByIndex(0));
+  temp2 = sen2.getTempCByIndex(0);
+  Serial.println(temp2);
+  Blynk.virtualWrite(V0, temp1);
+  Blynk.virtualWrite(V1, temp2);
 }
 
 void out_pwm()
 {
-  ledcWrite(PWM_CHANNEL1, 500);
-  ledcWrite(PWM_CHANNEL2, 500);
-  delay(2000);
-  ledcWrite(PWM_CHANNEL1, 1023);
-  ledcWrite(PWM_CHANNEL2, 1023);
-  delay(2000);
+  ledcWrite(PWM_CHANNEL1, pwm1);
+  ledcWrite(PWM_CHANNEL2, pwm2);
+  Blynk.virtualWrite(V4, pwm1);
+  Blynk.virtualWrite(V5, pwm2);
 }
 
 void myTimerEvent()
 {
- Connected2Blynk = Blynk.connected();
- if (!Connected2Blynk) {
-   Serial.println("Not connected to Blynk server");
- }
- else {
-   Serial.println("Still connected to Blynk server");
- }
+  Connected2Blynk = Blynk.connected();
+  if (!Connected2Blynk)
+  {
+    Serial.println("Not connected to Blynk server");
+  }
+  else
+  {
+    Serial.println("Still connected to Blynk server");
+  }
+}
+
+void display_lcd(void)
+{
+  if (0 == page_lcd) //Main page
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+
+    lcd.setCursor(0, 1);
+    lcd.print("M1:");
+    if (mode_control1 == 0)
+    {
+      lcd.print("Auto");
+    }
+    else
+    {
+      lcd.print("Hand");
+    }
+
+    lcd.setCursor(10, 1);
+    lcd.print("M2:");
+    if (mode_control2 == 0)
+    {
+      lcd.print("Auto");
+    }
+    else
+    {
+      lcd.print("Hand");
+    }
+
+    lcd.setCursor(0, 2);
+    lcd.print("H1:");
+    lcd.print(temp1);
+    lcd.setCursor(10, 2);
+    lcd.print("H2:");
+    lcd.print(temp2);
+
+    lcd.setCursor(0, 3);
+    lcd.print("PWM1:");
+    lcd.print(pwm1);
+    lcd.setCursor(10, 3);
+    lcd.print("PWM2:");
+    lcd.print(pwm2);
+  }
+  if (1 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print("Config Mode1: ");
+    //lcd.setCursor(5, 2);
+    if (mode_control1 == 0)
+    {
+      lcd.print("Auto");
+    }
+    else
+    {
+      lcd.print("Hand");
+    }
+  }
+
+  if (2 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print("Config Mode2: ");
+    //lcd.setCursor(5, 2);
+    if (mode_control2 == 0)
+    {
+      lcd.print("Auto");
+    }
+    else
+    {
+      lcd.print("Hand");
+    }
+  }
+
+  if (3 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 1 Low");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm1_low);
+  }
+
+  if (4 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 1 Medium");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm1_medium);
+  }
+
+  if (5 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 1 High");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm1_high);
+  }
+
+  if (6 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 2 Low");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm2_low);
+  }
+
+  if (7 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 2 Medium");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm2_medium);
+  }
+
+  if (8 == page_lcd) //Mode1
+  {
+    lcd.setCursor(2, 0);
+    lcd.print("Heat Controling");
+    lcd.setCursor(0, 1);
+    lcd.print(" Fan Speed 2 High");
+    lcd.setCursor(6, 2);
+    lcd.print("Value:");
+    lcd.print(pwm2_high);
+  }
+}
+
+void re_update_to_blynk()
+{
+  Blynk.virtualWrite(V0, temp1);
+  Blynk.virtualWrite(V1, temp2);
+  Blynk.virtualWrite(V2, mode_control1);
+  Blynk.virtualWrite(V3, mode_control2);
+  Blynk.virtualWrite(V4, pwm1);
+  Blynk.virtualWrite(V5, pwm2);
 }
