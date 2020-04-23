@@ -42,11 +42,11 @@ DallasTemperature sen2(&oneWire_out);
 ///////--- Declare private varible  ----------
 int PWM_FREQUENCY = 5000;
 int PWM_CHANNEL1 = 0;
-int PWM_CHANNEL2 = 0;
+int PWM_CHANNEL2 = 1;
 int PWM_RESOUTION = 10;
 bool Connected2Blynk = false;
 int dem1, dem2, dem3, dem4, dem5;
-int pwm1, pwm2, pwm1_low, pwm1_medium, pwm1_high, pwm2_low, pwm2_medium, pwm2_high;
+int pwm1, pwm2, pwm1_low = 300, pwm1_medium = 600, pwm1_high = 1000, pwm2_low = 300, pwm2_medium = 600, pwm2_high = 1000;
 int mode_control1, mode_control2;
 float temp1, temp2;
 unsigned long time1, time2;
@@ -58,6 +58,7 @@ void out_pwm();
 void display_lcd(void);
 void re_update_to_blynk(void);
 void button_processing();
+void Heat_control_fan();
 void tick()
 {
   //toggle state
@@ -183,33 +184,36 @@ void setup()
 //----------------------------------------//
 void loop()
 {
-  ledcWrite(PWM_CHANNEL1, 400);
-  ledcWrite(PWM_CHANNEL2, 800);
-  // Blynk.run();
-  // button_processing();
-  // // Serial.print(digitalRead(BT1));
-  // // Serial.print(digitalRead(BT2));
-  // // Serial.print(digitalRead(BT3));
-  // // Serial.print(digitalRead(BT4));
-  // // Serial.println(digitalRead(BT5));
-  // if (millis() - time1 > 5000)
-  // {
-  //   get_tem();
-  //   time1 = millis();
-  // }
+  // ledcWrite(PWM_CHANNEL1, 400);
+  // ledcWrite(PWM_CHANNEL2, 800);
+  // Serial.print(digitalRead(BT1));
+  // Serial.print(digitalRead(BT2));
+  // Serial.print(digitalRead(BT3));
+  // Serial.print(digitalRead(BT4));
+  // Serial.println(digitalRead(BT5));
+  Blynk.run();
+  button_processing();
+  Heat_control_fan();
 
-  // if (millis() - time2 > 2000)
-  // {
-  //   display_lcd();
-  //   time2 = millis();
-  // }
-  // out_pwm();
-  // if (last_page_lcd != page_lcd)
-  // {
-  //   lcd.clear();
-  //   display_lcd();
-  //   last_page_lcd = page_lcd;
-  // }
+  if (millis() - time1 > 5000)
+  {
+    get_tem();
+    time1 = millis();
+  }
+
+  if (millis() - time2 > 5000)
+  {
+    lcd.clear();
+    display_lcd();
+    time2 = millis();
+  }
+  out_pwm();
+  if (last_page_lcd != page_lcd)
+  {
+    lcd.clear();
+    display_lcd();
+    last_page_lcd = page_lcd;
+  }
 }
 
 /*--------- End Loop--------------------*/
@@ -228,8 +232,8 @@ void button_processing()
   if (2 == dem1)
   {
     Serial.println("Button1 press");
-    page_lcd++;
-    if (page_lcd >= 9)
+    page_lcd--;
+    if (page_lcd < 0)
     {
       page_lcd = 0;
     }
@@ -247,8 +251,8 @@ void button_processing()
   if (2 == dem2)
   {
     Serial.println("Button2 press");
-    page_lcd--;
-    if (page_lcd < 0)
+    page_lcd++;
+    if (page_lcd >= 9)
     {
       page_lcd = 0;
     }
@@ -265,7 +269,90 @@ void button_processing()
   }
   if (2 == dem3)
   {
-    Serial.println("Button3 press");
+    Serial.println("Button 3 press");
+    if (page_lcd == 1) //Mode 1
+    {
+      lcd.clear();
+      mode_control1 = 0; //Set to auto
+      display_lcd();
+      Blynk.virtualWrite(V2, mode_control1);
+      Blynk.virtualWrite(V3, mode_control2);
+    }
+
+    if (page_lcd == 2) //Mode 2
+    {
+      lcd.clear();
+      mode_control2 = 0; //Set to auto
+      display_lcd();
+      Blynk.virtualWrite(V2, mode_control1);
+      Blynk.virtualWrite(V3, mode_control2);
+    }
+
+    if (page_lcd == 3) // Change PWM1_LOW
+    {
+      lcd.clear();
+      pwm1_low -= 100; //Set to auto
+      if (pwm1_low < 0)
+      {
+        pwm1_low = 0;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 4) // Change PWM1_Medium
+    {
+      lcd.clear();
+      pwm1_medium -= 100; //Set to auto
+      if (pwm1_medium < 0)
+      {
+        pwm1_medium = 0;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 5) // Change PWM1_High
+    {
+      lcd.clear();
+      pwm1_high -= 100; //Set to auto
+      if (pwm1_high < 0)
+      {
+        pwm1_high = 0;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 6) // Change PWM2_LOW
+    {
+      lcd.clear();
+      pwm2_low -= 100; //Set to auto
+      if (pwm2_low < 0)
+      {
+        pwm2_low = 0;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 7) // Change PWM1_Medium
+    {
+      lcd.clear();
+      pwm2_medium -= 100; //Set to auto
+      if (pwm2_medium < 0)
+      {
+        pwm2_medium = 0;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 8) // Change PWM1_High
+    {
+      lcd.clear();
+      pwm2_high -= 100; //Set to auto
+      if (pwm2_high < 0)
+      {
+        pwm2_high = 0;
+      }
+      display_lcd();
+    }
   }
 
   //--- Button 4
@@ -280,6 +367,89 @@ void button_processing()
   if (2 == dem4)
   {
     Serial.println("Button4 press");
+    if (page_lcd == 1) //Mode 1
+    {
+      lcd.clear();
+      mode_control1 = 1; //Set to hand
+      display_lcd();
+      Blynk.virtualWrite(V2, mode_control1);
+      Blynk.virtualWrite(V3, mode_control2);
+    }
+
+    if (page_lcd == 2) //Mode 2
+    {
+      lcd.clear();
+      mode_control2 = 1; //Set to hand
+      display_lcd();
+      Blynk.virtualWrite(V2, mode_control1);
+      Blynk.virtualWrite(V3, mode_control2);
+    }
+
+    if (page_lcd == 3) // Change PWM1_LOW
+    {
+      lcd.clear();
+      pwm1_low += 100; //Set to auto
+      if (pwm1_low > 1023)
+      {
+        pwm1_low = 1023;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 4) // Change PWM1_Medium
+    {
+      lcd.clear();
+      pwm1_medium += 100; //Set to auto
+      if (pwm1_medium > 1023)
+      {
+        pwm1_medium = 1023;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 5) // Change PWM1_High
+    {
+      lcd.clear();
+      pwm1_high += 100; //Set to auto
+      if (pwm1_high > 1023)
+      {
+        pwm1_high = 1023;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 6) // Change PWM2_LOW
+    {
+      lcd.clear();
+      pwm2_low += 100; //Set to auto
+      if (pwm2_low > 1023)
+      {
+        pwm2_low = 1023;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 7) // Change PWM1_Medium
+    {
+      lcd.clear();
+      pwm2_medium += 100; //Set to auto
+      if (pwm2_medium > 1023)
+      {
+        pwm2_medium = 1023;
+      }
+      display_lcd();
+    }
+
+    if (page_lcd == 8) // Change PWM1_High
+    {
+      lcd.clear();
+      pwm2_high += 100; //Set to auto
+      if (pwm2_high > 1023)
+      {
+        pwm2_high = 1023;
+      }
+      display_lcd();
+    }
   }
 
   //--- Button 5
@@ -295,6 +465,8 @@ void button_processing()
   {
     Serial.println("Button5 press");
     page_lcd = 0;
+    lcd.clear();
+    display_lcd();
   }
 }
 void get_tem(void)
@@ -397,7 +569,7 @@ void display_lcd(void)
     }
   }
 
-  if (2 == page_lcd) //Mode1
+  if (2 == page_lcd) //Mode2
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -414,7 +586,7 @@ void display_lcd(void)
     }
   }
 
-  if (3 == page_lcd) //Mode1
+  if (3 == page_lcd) //PWM1_LOW
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -425,7 +597,7 @@ void display_lcd(void)
     lcd.print(pwm1_low);
   }
 
-  if (4 == page_lcd) //Mode1
+  if (4 == page_lcd) //PWM1_Medium
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -436,7 +608,7 @@ void display_lcd(void)
     lcd.print(pwm1_medium);
   }
 
-  if (5 == page_lcd) //Mode1
+  if (5 == page_lcd) //PWM1_HIGH
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -447,7 +619,7 @@ void display_lcd(void)
     lcd.print(pwm1_high);
   }
 
-  if (6 == page_lcd) //Mode1
+  if (6 == page_lcd) //PWM2_LOW
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -458,7 +630,7 @@ void display_lcd(void)
     lcd.print(pwm2_low);
   }
 
-  if (7 == page_lcd) //Mode1
+  if (7 == page_lcd) //PWM2_Medium
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -469,7 +641,7 @@ void display_lcd(void)
     lcd.print(pwm2_medium);
   }
 
-  if (8 == page_lcd) //Mode1
+  if (8 == page_lcd) //PWM2_High
   {
     lcd.setCursor(2, 0);
     lcd.print("Heat Controling");
@@ -489,4 +661,44 @@ void re_update_to_blynk()
   Blynk.virtualWrite(V3, mode_control2);
   Blynk.virtualWrite(V4, pwm1);
   Blynk.virtualWrite(V5, pwm2);
+}
+
+void Heat_control_fan()
+{
+  ///////////////////////
+  if (0 == mode_control1)
+  {
+    if (temp1 < 25)
+    {
+      pwm1 = pwm1_low;
+    }
+
+    if (temp1 < 35 && temp1 >= 25)
+    {
+      pwm1 = pwm1_medium;
+    }
+
+    if (temp1 > 35)
+    {
+      pwm1 = pwm1_high;
+    }
+  }
+  ///////////////////////
+  if (0 == mode_control2)
+  {
+    if (temp2 < 25)
+    {
+      pwm2 = pwm2_low;
+    }
+
+    if (temp2 < 35 && temp2 >= 25)
+    {
+      pwm2 = pwm2_medium;
+    }
+
+    if (temp2 > 35)
+    {
+      pwm2 = pwm2_high;
+    }
+  }
 }
